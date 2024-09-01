@@ -1,11 +1,10 @@
 import sqlite3
-
+import csv
 db = sqlite3.connect("practice.sqlite")
 cursor = db.cursor()
 cursor.execute("CREATE TABLE IF NOT EXISTS books (id INTEGER NOT NULL PRIMARY KEY,title TEXT NOT NULL,author TEXT NOT NULL,status INTEGER)")
 db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER NOT NULL PRIMARY KEY,name TEXT NOT NULL)")
 db.execute("CREATE TABLE IF NOT EXISTS borrow_info (user_id INTEGER NOT NULL,book_id INTEGER NOT NULL,borrow_date DATE NOT NULL,PRIMARY KEY (user_id, book_id))")
-
 
 class Library:
     
@@ -48,7 +47,15 @@ class Library:
     def update_user(self,user):
         with db:
             cursor.execute("UPDATE users SET name=:name WHERE id=:id",{'id':user.id,'name':user.name})
-
+    def export_to_csv(self):
+        with db:
+            cursor.execute(f"SELECT * FROM books")
+            row = cursor.description
+            column = [field[0] for field in row]
+            with open('book.csv','w',newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(column)
+                writer.writerows(cursor.fetchall())
 class Book:
     
     def __init__(self,id,title,author,status=False) -> None:
@@ -138,7 +145,9 @@ def main():
                     print("----Usage Report-----")
                     Library1.report()
                 if choice == 9:
-                    pass
+                    exported = Library1.export_to_csv()
+                    if exported:
+                        print("The file as exported book.csv")
         else:
             print("Welcome to library")
             user = User(user_id,user_name)
