@@ -72,13 +72,23 @@ class User:
         
     def borrow_book(self,id,borrow_date):
         with db:
-            cursor.execute("INSERT INTO borrow_info VALUES(:user_id,:book_id,:borrow_date)",{'book_id':id,'user_id':self.id,'borrow_date':borrow_date})
-            cursor.execute("UPDATE books set status=:status WHERE id=:id",{'status':False,'id':id})
-    
+            is_available = cursor.execute(f'SELECT status FROM books WHERE id={id}')
+            if (is_available.fetchone()[0] == 1):
+                cursor.execute("INSERT INTO borrow_info VALUES(:user_id,:book_id,:borrow_date)",{'book_id':id,'user_id':self.id,'borrow_date':borrow_date})
+                cursor.execute("UPDATE books set status=:status WHERE id=:id",{'status':False,'id':id})
+            else:
+                print("The book is not available")
+                
     def return_book(self,book_id):
         with db:
-            cursor.execute("DELETE FROM borrow_info WHERE user_id=:user_id AND book_id=:book_id",{'book_id':book_id,'user_id':self.id})
-            cursor.execute("UPDATE books set status=:status WHERE id=:id",{'status':True,'id':self.id})
+            is_available = cursor.execute(f'SELECT status FROM books WHERE id={book_id}')
+            if (is_available.fetchone()[0] == 1):
+                print("The book is not borrowed yet")
+            else:
+                cursor.execute("DELETE FROM borrow_info WHERE user_id=:user_id AND book_id=:book_id",{'book_id':book_id,'user_id':self.id})
+                cursor.execute("UPDATE books set status=:status WHERE id=:id",{'status':True,'id':book_id})
+                print("You have returned the book successfully")
+     
 
 
 def main():
