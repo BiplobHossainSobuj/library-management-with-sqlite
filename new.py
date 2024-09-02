@@ -1,9 +1,10 @@
 import sqlite3
 import csv
+import hashlib
 db = sqlite3.connect("practice.sqlite")
 cursor = db.cursor()
 cursor.execute("CREATE TABLE IF NOT EXISTS books (id INTEGER NOT NULL PRIMARY KEY,title TEXT NOT NULL,author TEXT NOT NULL,status INTEGER)")
-db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER NOT NULL PRIMARY KEY,name TEXT NOT NULL)")
+db.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER NOT NULL PRIMARY KEY,name TEXT NOT NULL,password TEXT NOT NULL)")
 db.execute("CREATE TABLE IF NOT EXISTS borrow_info (user_id INTEGER NOT NULL,book_id INTEGER NOT NULL,borrow_date DATE NOT NULL,PRIMARY KEY (user_id, book_id))")
 
 class Library:
@@ -37,8 +38,11 @@ class Library:
             return len(number_of_items)
     
     def add_user(self,user):
+        hash_func = hashlib.sha256()
+        hash_func.update(user.password.encode())
+        hashed_pass = hash_func.hexdigest()
         with db:
-            cursor.execute("INSERT INTO users VALUES (:id, :name)",{'id':user.id,'name':user.name})
+            cursor.execute("INSERT INTO users VALUES (:id, :name, :password)",{'id':user.id,'name':user.name,'password':hashed_pass})
             
     def delete_user(self,id):
         with db:
@@ -66,10 +70,24 @@ class Book:
 
 class User:
     
-    def __init__(self,id,name) -> None:
+    def __init__(self,id,name,password) -> None:
         self.id = id
         self.name = name
+        self.password = password
         
+    def get_hash(self):
+        hash_func = hashlib.sha256()
+        hash_func.update(self.password.encode())
+        hashed_pass = hash_func.hexdigest()
+        # print(hashed_pass)
+        return hashed_pass
+    
+    def verify_user(self):
+        with db:
+            cursor.execute("SELECT password FROM users WHERE id=:id",{'id':self.id})
+            stored_hashed_password = cursor.fetchone()
+        return self.get_hash() == stored_hashed_password[0]
+    
     def borrow_book(self,id,borrow_date):
         with db:
             is_available = cursor.execute(f'SELECT status FROM books WHERE id={id}')
@@ -92,92 +110,111 @@ class User:
 
 
 def main():
-    while True:
-        user_id = int(input("Enter user id: "))
-        user_name = str(input("Enter user name: "))
-        user_pass = str(input("Enter Password: "))
-        
-        if user_name=='admin' and user_pass=='admin':
-            choice=0
-            while choice != 10:
-                print("-----Welcome to the Library-----")
-                print('1.Add book')
-                print('2.Remove Book')
-                print('3.Update Book')
-                print('4.Search Book')
-                print('5.Add User')
-                print('6.Remove User')
-                print('7.Update User')
-                print('8.Usage Report')
-                print('9.Export csv')
-                print('10.Exit')
-                choice = int(input('Enter a number between 1 to 10: '))
-                Library1 = Library()
-                if choice == 1:
-                    print("------Add a new book-----")
-                    id = int(input("Enter a book ID: "))
-                    title = str(input("Enter title of the book: "))
-                    author = str(input("Enter author of the book: "))
-                    book = Book(id,title,author,True)
-                    Library1.insert_book(book)
-                if choice == 2:
-                    id = int(input("Enter a book ID: "))
-                    Library1.delete_book(id)
-                if choice == 3:
-                    print("------Update book -----")
-                    id = int(input("Enter a book ID to be updated: "))
-                    title = str(input("Enter title of the book: "))
-                    author = str(input("Enter author of the book: "))
-                    book = Book(id,title,author)
-                    Library1.update_book(book)
-                if choice == 4:
-                    print("------Search book -----")
-                    title = str(input("Enter title of the book: "))
-                    book=Library1.search_book(title)
-                    print("Search Result: ",book)
-                if choice == 5:
-                    print("-----Add User___")
-                    id = int(input("Enter user Id: "))
-                    name = str(input("Enter user Name: "))
-                    user = User(id,name)
-                    Library1.add_user(user)
-                if choice == 6:
-                    print("Remove User")
-                    id = int(input("Enter user id: "))
-                    Library1.delete_user(id)
-                if choice == 7:
-                    print("Update User")
-                    id = int(input("Enter user Id: "))
-                    name = str(input("Enter user Name: "))
-                    user = User(id,name)
-                    Library1.update_user(user)
-                if choice == 8:
-                    print("----Usage Report-----")
-                    Library1.report()
-                if choice == 9:
-                    exported = Library1.export_to_csv()
-                    if exported:
-                        print("The file as exported book.csv")
-        else:
-            print("Welcome to library")
-            user = User(user_id,user_name)
-            choice = 0
-            while choice != 3:
-                print("1.Borrow Book")
-                print("2.Return Book")
-                choice = int(input("Select you choice: "))
-                
-                if choice == 1:
-                    book_id = int(input("Enter book id: "))
-                    borrow_date = str(input("Enter Date: "))
-                    user.borrow_book(book_id,borrow_date)
-                elif choice == 2:
-                    book_id = int(input("Enter book id: "))
-                    user.return_book(book_id)
-                else:
-                    break
-    else:
-        print("Something went wrong")           
+    option = 0
+    print("1.login as user")
+    print("2.login as admin")
+    print("3.Create Account")
+    print("4.Exit")
+    while option !=4:
+        option = int(input("Select you choice: "))
+        if option == 1:
+            user_id = int(input("Enter user id: "))
+            user_name = str(input("Enter user name: "))
+            user_pass = str(input("Enter Password: "))
+            user = User(user_id,user_name,user_pass)
+            
+            if user.verify_user():
+                choice = 0
+                while choice != 3:
+                    print("1.Borrow Book")
+                    print("2.Return Book")
+                    choice = int(input("Select you choice: "))
+                    
+                    if choice == 1:
+                        book_id = int(input("Enter book id: "))
+                        borrow_date = str(input("Enter Date: "))
+                        user.borrow_book(book_id,borrow_date)
+                    elif choice == 2:
+                        book_id = int(input("Enter book id: "))
+                        user.return_book(book_id)
+                    else:
+                        break
+            else:
+                print("Invalid user")
+        elif option == 2:
+            user_name = str(input("Enter user name: "))
+            user_pass = str(input("Enter Password: "))
+            if user_name=='admin' and user_pass=='admin':
+                choice=0
+                while choice != 10:
+                    print("-----Welcome to the Library-----")
+                    print('1.Add book')
+                    print('2.Remove Book')
+                    print('3.Update Book')
+                    print('4.Search Book')
+                    print('5.Add User')
+                    print('6.Remove User')
+                    print('7.Update User')
+                    print('8.Usage Report')
+                    print('9.Export csv')
+                    print('10.Exit')
+                    choice = int(input('Enter a number between 1 to 10: '))
+                    Library1 = Library()
+                    if choice == 1:
+                        print("------Add a new book-----")
+                        id = int(input("Enter a book ID: "))
+                        title = str(input("Enter title of the book: "))
+                        author = str(input("Enter author of the book: "))
+                        book = Book(id,title,author,True)
+                        Library1.insert_book(book)
+                    if choice == 2:
+                        id = int(input("Enter a book ID: "))
+                        Library1.delete_book(id)
+                    if choice == 3:
+                        print("------Update book -----")
+                        id = int(input("Enter a book ID to be updated: "))
+                        title = str(input("Enter title of the book: "))
+                        author = str(input("Enter author of the book: "))
+                        book = Book(id,title,author)
+                        Library1.update_book(book)
+                    if choice == 4:
+                        print("------Search book -----")
+                        title = str(input("Enter title of the book: "))
+                        book=Library1.search_book(title)
+                        print("Search Result: ",book)
+                    if choice == 5:
+                        print("-----Add User___")
+                        id = int(input("Enter user Id: "))
+                        name = str(input("Enter user Name: "))
+                        password = str(input("Enter password: "))
+                        user = User(id,name,password)
+                        Library1.add_user(user)
+                    if choice == 6:
+                        print("Remove User")
+                        id = int(input("Enter user id: "))
+                        Library1.delete_user(id)
+                    if choice == 7:
+                        print("Update User")
+                        id = int(input("Enter user Id: "))
+                        name = str(input("Enter user Name: "))
+                        password = str(input("Enter New password"))
+                        user = User(id,name,password)
+                        Library1.update_user(user)
+                    if choice == 8:
+                        print("----Usage Report-----")
+                        Library1.report()
+                    if choice == 9:
+                        exported = Library1.export_to_csv()
+                        if exported:
+                            print("The file as exported book.csv")
+                    else:
+                        break
+            else:
+                print("Invalid user")
+        elif option == 3:
+            print('coming soon')
+    
+
 if __name__ == '__main__':
     main()
     db.close()
