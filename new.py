@@ -74,7 +74,10 @@ class User:
         self.id = id
         self.name = name
         self.password = password
-        
+    def create_account(self):
+        with db:
+            cursor.execute("INSERT INTO users VALUES (:id,:name,:password)",{'id':self.id,'name':self.name,'password':self.get_hash()})
+    
     def get_hash(self):
         hash_func = hashlib.sha256()
         hash_func.update(self.password.encode())
@@ -111,11 +114,12 @@ class User:
 
 def main():
     option = 0
-    print("1.login as user")
-    print("2.login as admin")
-    print("3.Create Account")
-    print("4.Exit")
+    
     while option !=4:
+        print("1.login as user")
+        print("2.login as admin")
+        print("3.Create Account")
+        print("4.Exit")
         option = int(input("Select you choice: "))
         if option == 1:
             user_id = int(input("Enter user id: "))
@@ -212,8 +216,13 @@ def main():
             else:
                 print("Invalid user")
         elif option == 3:
-            print('coming soon')
-    
+            print("-----Create User Account------")
+            id = int(input("Enter user Id: "))
+            name = str(input("Enter user Name: "))
+            password = str(input("Enter password: "))
+            user = User(id,name,password)
+            user.create_account()
+            print('Your account is created.Now login')
 
 if __name__ == '__main__':
     main()
